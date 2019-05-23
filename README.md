@@ -124,7 +124,3 @@ For any form tests involving the captcha, you can then mock the facade behaviour
         CaptchaFacade::shouldReceive('displayMultiple');
         CaptchaFacade::shouldReceive('multiple');
 ```
-
-## Contribute
-
-https://github.com/SeniorDeveloper0915/laravel-google-captcha/pulls
