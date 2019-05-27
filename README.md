@@ -1,7 +1,7 @@
-# Google captcha for laravel 5.*
+# Google captcha for Laravel 5.*
 > Support multiple captcha on page
 
-![google captcha for laravel 5](http://i.imgur.com/aHBOqAS.gif)
+![google captcha for Laravel 5](http://i.imgur.com/aHBOqAS.gif)
 
 > Inspired by [anhskohbo/no-captcha](https://github.com/anhskohbo/no-captcha) and base on [google captcha sdk](https://github.com/google/recaptcha).
 
@@ -28,7 +28,9 @@ Update your packages with ```composer update``` or install with ```composer inst
 
 ## Setup
 
-Add ServiceProvider to the `providers` array in `app/config/app.php`.
+> Has support auto discover for Laravel >=5.5
+
+Add ServiceProvider to the `providers` array in `config/app.php`.
 
 ```
 'Buzz\LaravelGoogleCaptcha\CaptchaServiceProvider',
@@ -38,6 +40,24 @@ Add ServiceProvider to the `providers` array in `app/config/app.php`.
 
 ```
 php artisan vendor:publish --provider="Buzz\LaravelGoogleCaptcha\CaptchaServiceProvider"
+```
+
+### Custom ReCaptcha request (available version 2.1.6)
+
+Edit ``get_request_method`` in the ``config/captcha.php`` config
+
+```php
+<?php
+/*
+ * Secret key and Site key get on https://www.google.com/recaptcha
+ * */
+return [
+    'secret' => env('CAPTCHA_SECRET', 'default_secret'),
+    'sitekey' => env('CAPTCHA_SITEKEY', 'default_sitekey'),
+    'get_request_method' => function () {
+        return new \ReCaptcha\RequestMethod\Post();
+    }
+];
 ```
 
 ## Configuration
@@ -57,7 +77,7 @@ CAPTCHA_SITEKEY=[site-key]
 {!! app('captcha')->display($attributes) !!}
 ```
 
-OR use Facade: add `'Captcha' => '\Buzz\LaravelGoogleCaptcha\CaptchaFacade',` to the `aliases` array in `app/config/app.php` and in template use:
+OR use Facade: add `'Captcha' => '\Buzz\LaravelGoogleCaptcha\CaptchaFacade',` to the `aliases` array in `config/app.php` and in template use:
 
 ```php
 {!! Captcha::display($attributes) !!}
@@ -105,6 +125,7 @@ $validate = Validator::make(Input::all(), [
     'g-recaptcha-response' => 'required|captcha'
 ]);
 ```
+
 ### Testing
 
 When using the Laravel Testing functionality, you will need to mock out the response for the captcha form element.
