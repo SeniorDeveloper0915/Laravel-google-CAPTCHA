@@ -2,7 +2,6 @@
 
 namespace Buzz\LaravelGoogleCaptcha;
 
-use Illuminate\Contracts\Foundation\Application;
 use ReCaptcha\ReCaptcha;
 
 class Captcha
@@ -15,13 +14,6 @@ class Captcha
      * @var string $callbackName
      */
     protected $callbackName = 'buzzNoCaptchaOnLoadCallback';
-
-    /**
-     * Name of widget ids
-     *
-     * @var string $widgetIdName
-     */
-    protected $widgetIdName = 'buzzNoCaptchaWidgetIds';
 
     /**
      * Each captcha attributes in multiple mode
@@ -38,23 +30,45 @@ class Captcha
     protected $options;
 
     /**
-     * @var \Illuminate\Contracts\Config\Repository $config
+     * Use this for communication between your site and Google. Be sure to keep it a secret.
+     *
+     * @var string $secret
      */
-    protected $config;
+    protected $secret;
 
     /**
-     * @var \Illuminate\Contracts\Config\Repository $app
+     * Use this in the HTML code your site serves to users.
+     *
+     * @var string $siteKey
      */
-    protected $app;
+    protected $siteKey;
 
     /**
-     * @param Application $app
+     * @param string $secret
+     * @param string $siteKey
      */
-    public function __construct(Application $app)
+    public function __construct($secret, $siteKey)
     {
-        $this->app = $app;
-        $this->config = $this->app['config'];
-        $this->options = new Option($this->config->get('captcha.options'));
+        $this->options = new Option(['multiple' => false]);
+        $this->secret = $secret;
+        $this->siteKey = $siteKey;
+    }
+
+    /**
+     * Create captcha element with attributes
+     *
+     * @param  array $attributes
+     *
+     * @return string
+     */
+    protected function buildAttributes(array $attributes)
+    {
+        $html = [];
+        foreach ($attributes as $key => $value) {
+            $html[] = $key . '="' . $value . '"';
+        }
+
+        return count($html) ? ' ' . implode(' ', $html) : '';
     }
 
     /**
@@ -75,27 +89,59 @@ class Captcha
             $html .= '<script src="' . $this->getJsLink($options) . '" async defer></script>';
         }
         unset($attributes['add-js']);
-        $attributeOptions = $this->options->get('attributes', $options);
-        if (!empty($attributeOptions)) {
-            $attributes = array_merge($attributeOptions, $attributes);
+        if (!empty($this->options->get('attributes', $options))) {
+            $attributes = array_merge($this->options->get('attributes', $options), $attributes);
         }
         if ($isMultiple) {
             array_push($this->captchaAttributes, $attributes);
         } else {
-            $attributes['data-sitekey'] = $this->config->get('captcha.sitekey');
+            $attributes['data-sitekey'] = $this->siteKey;
         }
 
         return $html . '<div class="g-recaptcha"' . $this->buildAttributes($attributes) . '></div>';
     }
 
     /**
-     * Random id unique
+     * Display multiple captcha on page
      *
+     * @param array $options
      * @return string
      */
-    protected function randomCaptchaId()
+    public function displayMultiple($options = [])
     {
-        return 'buzzNoCaptchaId_' . md5(uniqid(rand(), true));
+        if (!$this->options->get('multiple', $options)) {
+            return '';
+        }
+        $excludeAttributes = ['id'];
+        $html = ' <script type="text/javascript">var ' . $this->callbackName . ' = function() {';
+        foreach ($this->captchaAttributes as $index => $captchaAttribute) {
+            $attributes = ['sitekey' => $this->siteKey];
+            foreach ($captchaAttribute as $key => $value) {
+                if (in_array($key, $excludeAttributes)) {
+                    continue;
+                }
+                if (strpos($key, 'data-') === false) {
+                    $attributes[$key] = $value;
+                } else {
+                    $attributes[str_replace('data-', '', $key)] = $value;
+                }
+            }
+            $html .= 'grecaptcha.render(\'' . $captchaAttribute['id'] . '\', ' . json_encode($attributes) . ');';
+        }
+        $html .= '};</script>';
+
+        return $html;
+    }
+
+    /**
+     * @param array $options
+     * @param array $attributes
+     * @return string
+     * @internal param null $lang
+     */
+    public function displayJs($options = [], $attributes = ['async', 'defer'])
+    {
+        return '<script src="' . $this->getJsLink($options) . '" ' . implode(' ', $attributes) . '></script>';
     }
 
     /**
@@ -118,53 +164,7 @@ class Captcha
             $query['hl'] = $lang;
         }
 
-        return static::CAPTCHA_CLIENT_API . '?' . http_build_query($query, null, '&amp;');
-    }
-
-    /**
-     * Create captcha element with attributes
-     *
-     * @param  array $attributes
-     * @return string
-     */
-    protected function buildAttributes(array $attributes)
-    {
-        $html = [];
-        foreach ($attributes as $key => $value) {
-            $html[] = $key . '="' . $value . '"';
-        }
-
-        return count($html) ? ' ' . implode(' ', $html) : '';
-    }
-
-    /**
-     * Display multiple captcha on page
-     *
-     * @param array $options
-     * @return string
-     */
-    public function displayMultiple($options = [])
-    {
-        if (!$this->options->get('multiple', $options)) {
-            return '';
-        }
-        $renderHtml = '';
-        foreach ($this->captchaAttributes as $captchaAttribute){
-            $renderHtml .= "{$this->widgetIdName}[\"{$captchaAttribute['id']}\"]={$this->buildCaptchaHtml($captchaAttribute)}";
-        }
-
-        return "<script type=\"text/javascript\">var {$this->widgetIdName}={};var {$this->callbackName}=function(){{$renderHtml}};</script>";
-    }
-
-    /**
-     * @param array $options
-     * @param array $attributes
-     * @return string
-     * @internal param null $lang
-     */
-    public function displayJs($options = [], $attributes = ['async', 'defer'])
-    {
-        return '<script src="' . htmlspecialchars($this->getJsLink($options)) . '" ' . implode(' ', $attributes) . '></script>';
+        return static::CAPTCHA_CLIENT_API . '?' . http_build_query($query);
     }
 
     /**
@@ -173,6 +173,16 @@ class Captcha
     public function multiple($multiple = true)
     {
         $this->options->multiple = $multiple;
+    }
+
+    /**
+     * Random id unique
+     *
+     * @return string
+     */
+    protected function randomCaptchaId()
+    {
+        return 'buzzNoCaptchaId_' . md5(uniqid(rand(), true));
     }
 
     /**
@@ -188,37 +198,14 @@ class Captcha
      *
      * @param  string $response
      * @param  string $clientIp
+     *
      * @return bool
      */
     public function verify($response, $clientIp = null)
     {
-        if (empty($response)) {
-            return false;
-        }
-        $getRequestMethod = $this->config->get('captcha.request_method');
-        $requestMethod = is_string($getRequestMethod) ? $this->app->call($getRequestMethod) : null;
-        $reCaptCha = new ReCaptcha($this->config->get('captcha.secret'), $requestMethod);
+        if (empty($response)) return false;
+        $resp = (new ReCaptcha($this->secret))->verify($response, $clientIp);
 
-        return $reCaptCha->verify($response, $clientIp)->isSuccess();
-    }
-
-    /**
-     * Build captcha by attributes
-     *
-     * @param array $captchaAttribute
-     *
-     * @return string
-     */
-    protected function buildCaptchaHtml(array $captchaAttribute)
-    {
-        $options = array_merge(
-            ['sitekey' => $this->config->get('captcha.sitekey')],
-            $this->config->get('captcha.attributes', [])
-        );
-        foreach ($captchaAttribute as $key => $value) {
-            $options[str_replace('data-', '', $key)] = $value;
-        }
-        $options = json_encode($options);
-        return "grecaptcha.render('{$captchaAttribute['id']}',{$options});";
+        return $resp->isSuccess();
     }
 }

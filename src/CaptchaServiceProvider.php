@@ -20,22 +20,25 @@ class CaptchaServiceProvider extends ServiceProvider
      */
     public function boot()
     {
-        /**
-         * @var \Illuminate\Contracts\Foundation\Application $app
-         */
         $app = $this->app;
         $this->bootConfig();
-        $app['validator']->extend('captcha', function ($attribute, $value) use ($app) {
+        /** @noinspection PhpUnusedParameterInspection */
+        $app['validator']->extend(
+            'captcha', function ($attribute, $value) use ($app) {
             return $app['captcha']->verify($value, $app['request']->getClientIp());
-        });
+        }
+        );
         if ($app->bound('form')) {
-            $app['form']->macro('captcha', function ($attributes = []) use ($app) {
+            $app['form']->macro(
+                'captcha', function ($attributes = []) use ($app) {
                 return $app['captcha']->display($attributes, ['lang' => $app->getLocale()]);
-            });
+            }
+            );
         }
     }
 
     /**
+     * //
      *
      * @return void
      */
@@ -44,7 +47,7 @@ class CaptchaServiceProvider extends ServiceProvider
         $path = __DIR__ . '/../config/config.php';
         $this->mergeConfigFrom($path, 'captcha');
         $this->publishes([
-            $path => $this->app->make('path.config') . (DIRECTORY_SEPARATOR . 'captcha.php'),
+            $path => implode(DIRECTORY_SEPARATOR, [$this->app->make('path.config'), 'captcha.php'])
         ]);
     }
 
@@ -55,9 +58,14 @@ class CaptchaServiceProvider extends ServiceProvider
      */
     public function register()
     {
-        $this->app->singleton('captcha', function ($app) {
-            return new Captcha($app);
-        });
+        $this->app->singleton(
+            'captcha', function ($app) {
+            return new Captcha(
+                $app['config']['captcha.secret'],
+                $app['config']['captcha.sitekey']
+            );
+        }
+        );
     }
 
     /**

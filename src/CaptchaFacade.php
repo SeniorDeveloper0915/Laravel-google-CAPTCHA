@@ -10,8 +10,5 @@ class CaptchaFacade extends Facade
      *
      * @return string
      */
-    protected static function getFacadeAccessor()
-    {
-        return 'captcha';
-    }
+    protected static function getFacadeAccessor(){ return 'captcha'; }
 }
